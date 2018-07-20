@@ -9,34 +9,51 @@ typedef     struct
 } __attribute__ (( __aligned__( 16 ) )) uint128_t;
 
 
-inline unsigned char cas(uint128_t * addr, uint128_t old, uint128_t new)
+#define cas128(addr, old, new) ( {\
+    unsigned char ret;\
+    __asm__ __volatile__\
+    (\
+    "lock cmpxchg16b  %1\n\t"\
+    "setz %0"\
+    : "=q" ( ret )\
+    , "+m" ( *addr)\
+    , "+d" ( old.hi )\
+    , "+a" ( old.lo )\
+    : "c" ( new.hi )\
+    , "b" ( new.lo )\
+    : "cc"\
+    ); ret;})
+
+void test(uint64_t a1, uint64_t a2, uint64_t b1, uint64_t b2, uint64_t c1, uint64_t c2)
 {
-    unsigned char ret;
-    __asm__ __volatile__
-    (
-    "lock cmpxchg16b  %1\n\t"
-    "setz %0"
-    : "=q" ( ret )
-    , "+m" ( *addr)
-    , "+d" ( old.hi )
-    , "+a" ( old.lo )
-    : "c" ( new.hi )
-    , "b" ( new.lo )
-    : "cc"
-    );
-    return ret;
+    uint128_t data;
+    uint128_t new; 
+    uint128_t old; 
+    int ret;
+
+    data.lo = a1;
+    data.hi = a2;
+
+    old.lo = b1;
+    old.hi = b2;
+
+    new.lo = c1;
+    new.hi = c2;
+
+    ret = cas128( &data, old, new);
+
+    printf("case ((%lu,%lu) , (%lu,%lu) , (%lu, %lu) => %d\n", a1,a2,b1,b2,c1,c2,ret);
 }
+
 
 int main()
 {
-    uint128_t data =  { 1, 2 };
-    uint128_t new  =  { 3, 4};
-    uint128_t old  =  data;
 
-    old.lo  = 2;
-    int ret = cas( &data, old, new);
 
-    printf("cas %d\n",ret);
+    test(1,1,1,1,8,9);
+    test(1,2,1,2,8,9);
+    test(1,2,1,1,8,9);
+    test(1,2,2,1,8,9);
 
     return 0;
 } 
